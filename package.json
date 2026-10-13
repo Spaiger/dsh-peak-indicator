@@ -1,0 +1,99 @@
+{
+  "name": "dsh-peak-indicator",
+  "version": "0.1.1",
+  "description": "DeepSeek Harness (DSH) client plugin: peak / off-peak tariff capsule in the Session header, computed on Beijing time (Asia/Shanghai) with the official PRC holiday and make-up workday calendar",
+  "license": "MIT",
+  "type": "module",
+  "main": "lib/index.js",
+  "types": "lib/types/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./lib/types/index.d.ts",
+      "default": "./lib/index.js"
+    },
+    "./client": {
+      "types": "./lib/types/client/index.d.ts",
+      "default": "./lib/client.js"
+    },
+    "./locale/en.json": "./locale/en.json",
+    "./locale/ru.json": "./locale/ru.json",
+    "./locale/zh.json": "./locale/zh.json",
+    "./src/*": "./src/*",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "lib/index.js",
+    "lib/index.js.map",
+    "lib/client.js",
+    "lib/client.js.map",
+    "lib/types/**/*.d.ts",
+    "locale/*.json",
+    "cordis.patch.yml",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "npm run typecheck && npm run types && npm run bundle",
+    "bundle": "tsdown",
+    "watch": "tsdown --watch",
+    "types": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.test.json --noEmit",
+    "test": "npm run bundle && vitest run",
+    "test:unit": "vitest run",
+    "test:watch": "vitest",
+    "demo": "node demo/build.mjs && node tools/verify-demo.mjs",
+    "demo:build": "node demo/build.mjs",
+    "verify": "npm run typecheck && npm run build && npm test && npm run demo",
+    "prepare": "npm run types && npm run bundle"
+  },
+  "keywords": [
+    "deepseek",
+    "deepseek-harness",
+    "dsh",
+    "plugin",
+    "cordis",
+    "peak",
+    "off-peak",
+    "pricing",
+    "china-holidays"
+  ],
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "inject": [],
+      "platform": "web"
+    }
+  },
+  "peerDependencies": {
+    "@deepseek-ai/cordis": ">=4.0.4 <5.0.0-0",
+    "@deepseek-ai/dsh": ">=0.2.0-rc.1 <0.3.0-0",
+    "@deepseek-ai/dsh-client-ui-primitives": ">=0.0.1-0 <0.3.0-0"
+  },
+  "devDependencies": {
+    "@deepseek-ai/cordis": "4.0.5-alpha.1",
+    "@deepseek-ai/dsh-api-session-controller": "0.2.1-alpha.2",
+    "@deepseek-ai/dsh-client-ui-conversation": "0.2.1-alpha.2",
+    "@deepseek-ai/dsh-client-ui-primitives": "0.2.1-alpha.2",
+    "@deepseek-ai/dsh-client-ui-renderer": "0.2.1-alpha.2",
+    "@deepseek-ai/dsh-client-ui-session": "0.2.1-alpha.2",
+    "@deepseek-ai/dsh-client-ui-slots": "0.2.1-alpha.2",
+    "@tsdown/css": "^0.21.10",
+    "@types/node": "^20.19.43",
+    "@types/react": "~18.3.1",
+    "@types/react-test-renderer": "^18.3.1",
+    "esbuild": "^0.28.2",
+    "happy-dom": "^15.11.7",
+    "react": "^18.2.0",
+    "react-test-renderer": "18.3.1",
+    "tsdown": "0.22.2",
+    "tsx": "^4.23.13",
+    "typescript": "^6.0.3",
+    "unrun": "^0.2.39",
+    "vitest": "^4.1.11"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

@@ -1,0 +1,16 @@
+{
+  // Declaration emit for the published `./client` types. Mirrors the DSH
+  // monorepo layout, where `tsc -b` writes lib/types and tsdown consumes it.
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": false,
+    // Both halves, like the monorepo: the JS half is what tsdown bundles for the
+    // browser (relative `.ts` specifiers already rewritten to `.js`), and the
+    // `.d.ts` half is what package.json publishes as `./client` types.
+    "emitDeclarationOnly": false,
+    "declarationMap": true,
+    "outDir": "lib/types",
+    "rootDir": "src"
+  },
+  "include": ["src"]
+}

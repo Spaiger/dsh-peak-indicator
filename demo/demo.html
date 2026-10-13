@@ -1,0 +1,419 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>dsh-peak-indicator — демо капсулы ⚡/🌙</title>
+<style>
+  :root {
+    color-scheme: light dark;
+    --bg: #ffffff;
+    --panel: #f7f8f9;
+    --line: #e3e6e8;
+    --text: #1c2024;
+    --muted: #6b7280;
+    --peak: #e5484d;
+    --off: #30a46c;
+    --accent: #4c6ef5;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #14161a; --panel: #1b1e24; --line: #2c313a;
+      --text: #e6e8ea; --muted: #9aa3ad;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; padding: 28px 20px 64px;
+    background: var(--bg); color: var(--text);
+    font: 14px/1.55 ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif;
+  }
+  main { max-width: 940px; margin: 0 auto; display: grid; gap: 18px; }
+  h1 { font-size: 20px; margin: 0 0 4px; }
+  h2 { font-size: 14px; margin: 0 0 10px; letter-spacing: .02em; text-transform: uppercase; color: var(--muted); }
+  p.lede { margin: 0; color: var(--muted); }
+  section { border: 1px solid var(--line); border-radius: 12px; padding: 16px; background: var(--panel); }
+  .row { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
+  label { display: inline-flex; align-items: center; gap: 6px; color: var(--muted); }
+  input[type="datetime-local"], select {
+    font: inherit; color: var(--text); background: var(--bg);
+    border: 1px solid var(--line); border-radius: 8px; padding: 5px 8px;
+  }
+  button {
+    font: inherit; color: var(--text); background: var(--bg);
+    border: 1px solid var(--line); border-radius: 999px; padding: 5px 11px; cursor: pointer;
+  }
+  button:hover { border-color: var(--accent); color: var(--accent); }
+  button[aria-pressed="true"] { border-color: var(--accent); color: var(--accent); }
+
+  /* --- Mock of the DSH session header --- */
+  .header-mock {
+    display: flex; align-items: center; gap: 12px;
+    border: 1px solid var(--line); border-radius: 10px;
+    background: var(--bg); padding: 10px 12px;
+  }
+  .header-mock .title { font-weight: 600; }
+  .header-mock .actions { display: flex; align-items: center; gap: 6px; }
+  .header-mock .actions .title-side { margin-right: auto; display: flex; gap: 6px; align-items: center; }
+  .ghost-btn {
+    display: inline-flex; align-items: center; gap: 5px;
+    height: 24px; padding: 0 8px; border: 1px solid var(--line);
+    border-radius: 6px; background: transparent; color: var(--muted); font-size: 12px;
+  }
+  .utilities { margin-left: auto; display: flex; align-items: center; gap: 8px; }
+  .slot-tag { font-size: 11px; color: var(--muted); border: 1px dashed var(--line); border-radius: 6px; padding: 2px 6px; }
+  .tooltip-host { position: relative; display: inline-flex; }
+  .tooltip-bubble {
+    position: absolute; z-index: 5; top: calc(100% + 8px); right: 0;
+    width: max-content; max-width: 420px; padding: 8px 10px;
+    border-radius: 8px; background: #23262b; color: #f2f4f6;
+    font-size: 12.5px; line-height: 1.5; white-space: pre-line;
+    box-shadow: 0 8px 24px rgb(0 0 0 / .28);
+    opacity: 0; visibility: hidden; transition: opacity 120ms ease;
+    pointer-events: none;
+  }
+  .tooltip-host:hover .tooltip-bubble, .tooltip-host:focus-within .tooltip-bubble { opacity: 1; visibility: visible; }
+
+  /* --- Readout --- */
+  dl { display: grid; grid-template-columns: 210px 1fr; gap: 6px 14px; margin: 0; }
+  dt { color: var(--muted); }
+  dd { margin: 0; font-variant-numeric: tabular-nums; }
+  pre {
+    margin: 12px 0 0; padding: 10px 12px; overflow: auto;
+    border: 1px solid var(--line); border-radius: 8px; background: var(--bg);
+    font-size: 12px; line-height: 1.5;
+  }
+  code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+
+  /* --- Timeline --- */
+  .timeline { position: relative; height: 34px; border-radius: 8px; overflow: hidden; border: 1px solid var(--line); background: var(--bg); }
+  .timeline .seg { position: absolute; top: 0; bottom: 0; }
+  .timeline .seg.peak { background: color-mix(in srgb, var(--peak) 26%, transparent); border-inline: 1px solid var(--peak); }
+  .timeline .seg.off { background: color-mix(in srgb, var(--off) 16%, transparent); }
+  .timeline .cursor { position: absolute; top: -2px; bottom: -2px; width: 2px; background: var(--accent); }
+  .timeline .cursor::after {
+    content: attr(data-time); position: absolute; top: -18px; left: 50%; transform: translateX(-50%);
+    font-size: 11px; color: var(--accent); white-space: nowrap;
+  }
+  .scale { display: flex; justify-content: space-between; color: var(--muted); font-size: 11px; margin-top: 4px; font-variant-numeric: tabular-nums; }
+
+  .week { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; margin-top: 14px; }
+  .day { border: 1px solid var(--line); border-radius: 8px; padding: 6px 8px; background: var(--bg); font-size: 12px; }
+  .day b { display: block; font-size: 12px; }
+  .day span { color: var(--muted); font-size: 11px; }
+  .day[data-rule="holiday"] { border-color: var(--off); background: color-mix(in srgb, var(--off) 12%, transparent); }
+  .day[data-rule="weekend"] { background: color-mix(in srgb, var(--off) 7%, transparent); }
+  .day[data-rule="makeup-workday"] { border-color: var(--peak); border-style: dashed; }
+  .day[data-rule="workday"] { border-color: color-mix(in srgb, var(--peak) 45%, var(--line)); }
+
+  /* --- Acceptance table --- */
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th, td { text-align: left; padding: 7px 8px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { color: var(--muted); font-weight: 500; font-size: 12px; }
+  td.result { white-space: nowrap; font-variant-numeric: tabular-nums; }
+  .ok { color: var(--off); font-weight: 600; }
+  .bad { color: var(--peak); font-weight: 600; }
+  .hidden-note { color: var(--muted); }
+  .muted { color: var(--muted); }
+  .pill { display: inline-block; border: 1px solid var(--line); border-radius: 999px; padding: 1px 7px; font-size: 11px; color: var(--muted); }
+  .missing { padding: 40px; text-align: center; color: var(--peak); }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>dsh-peak-indicator — демо капсулы ⚡ Пик / 🌙 Непик</h1>
+    <p class="lede">
+      Автономный предпросмотр клиентского плагина для DeepSeek Harness. Логика та же, что в
+      <code>src/pricing.ts</code>: пекинское время (<code>Asia/Shanghai</code>), пик пн–пт
+      09:00–12:00 и 14:00–18:00, праздники КНР — весь день непик, перенесённые рабочие дни — как будни.
+      Страница не делает ни одного сетевого запроса.
+    </p>
+  </header>
+
+  <section>
+    <h2>Шапка сессии (макет)</h2>
+    <div class="header-mock">
+      <div class="actions">
+        <div class="title-side">
+          <span class="title">Рефакторинг платёжного модуля</span>
+          <span class="slot-tag" id="slot-tag">conversation.session.header.utilities</span>
+        </div>
+        <span class="ghost-btn" id="slot-actions-slot" hidden>слот: actions</span>
+        <span class="ghost-btn">⋯</span>
+        <span class="ghost-btn">📄 Журнал сессии</span>
+        <span class="utilities">
+          <span class="tooltip-host" id="host" tabindex="0">
+            <span id="capsule"></span>
+            <span class="tooltip-bubble" id="tooltip"></span>
+          </span>
+        </span>
+      </div>
+    </div>
+    <p class="muted" id="visibility-note" style="margin:10px 0 0"></p>
+  </section>
+
+  <section>
+    <h2>Управление временем и провайдером</h2>
+    <div class="row">
+      <label><input type="checkbox" id="live" checked /> сейчас (тикает)</label>
+      <label>Пекинское время <input type="datetime-local" id="when" step="60" /></label>
+      <label>Провайдер сессии
+        <select id="provider">
+          <option value="deepseek-account">deepseek-account · deepseek-v4-pro</option>
+          <option value="deepseek-official">deepseek-official · deepseek-flash</option>
+          <option value="openrouter-deepseek">openrouter · deepseek-v4-flash (модель DeepSeek)</option>
+          <option value="openai">openai · gpt-5.2</option>
+          <option value="none">проекция modelSelection отсутствует</option>
+        </select>
+      </label>
+      <label>Язык
+        <select id="language">
+          <option value="ru">ru</option>
+          <option value="en">en</option>
+        </select>
+      </label>
+    </div>
+    <div class="row" style="margin-top:12px">
+      <span class="muted">Быстрые случаи:</span>
+      <button data-at="2026-10-13T10:30">будни, пик</button>
+      <button data-at="2026-10-13T13:00">будни, окно</button>
+      <button data-at="2026-10-17T11:00">суббота</button>
+      <button data-at="2026-10-18T11:00">воскресенье</button>
+      <button data-at="2026-10-01T10:30">праздник (чт)</button>
+      <button data-at="2026-10-10T15:00">перенос, сб</button>
+      <button data-at="2026-09-20T09:30">перенос, вс</button>
+      <button data-at="2026-10-13T11:59:30" data-seconds="1">меньше часа</button>
+      <button data-at="2027-03-03T10:00">2027 (нет данных)</button>
+    </div>
+  </section>
+
+  <section>
+    <h2>Расчёт</h2>
+    <dl id="readout"></dl>
+    <pre><code id="json"></code></pre>
+  </section>
+
+  <section>
+    <h2>Сутки и неделя</h2>
+    <div class="timeline" id="timeline"></div>
+    <div class="scale" id="scale"></div>
+    <div class="week" id="week"></div>
+  </section>
+
+  <section>
+    <h2>Критерии приёмки</h2>
+    <table>
+      <thead>
+        <tr><th style="width:34%">Случай</th><th style="width:22%">Ожидание</th><th>Факт</th><th style="width:70px">Итог</th></tr>
+      </thead>
+      <tbody id="acceptance"></tbody>
+    </table>
+  </section>
+
+  <section>
+    <h2>Календарь КНР 2026 (国办发明电〔2025〕7号)</h2>
+    <p class="muted" style="margin-top:0">
+      Праздники: <span id="holiday-count"></span> дн. · Перенесённые рабочие дни: <span id="makeup-list"></span>.
+      Покрытые годы: <span id="covered-years"></span>.
+      Таблица зашита жёстко; 2027 добавляется одной константой в <code>src/holidays.ts</code>.
+    </p>
+  </section>
+</main>
+
+<script>/*__DEMO_BUNDLE__*/</script>
+<script>
+(function () {
+  if (typeof window.__peakDemo === 'undefined') {
+    document.querySelector('main').innerHTML =
+      '<p class="missing">Демо не собрано: выполните <code>npm run demo</code> (нужен esbuild).</p>'
+    return
+  }
+  var api = window.__peakDemo
+
+  var ROUTES = {
+    'deepseek-account': { next: { provider: 'deepseek-account', model: 'deepseek-v4-pro' }, lastUsed: null },
+    'deepseek-official': { next: { provider: 'deepseek-official', model: 'deepseek-flash' }, lastUsed: null },
+    'openrouter-deepseek': { next: { provider: 'openrouter', model: 'deepseek-v4-flash' }, lastUsed: null },
+    'openai': { next: { provider: 'openai', model: 'gpt-5.2' }, lastUsed: null },
+    'none': undefined
+  }
+
+  var el = function (id) { return document.getElementById(id) }
+  var capsule = el('capsule'), tooltip = el('tooltip'), readout = el('readout')
+  var json = el('json'), timeline = el('timeline'), scale = el('scale')
+  var week = el('week'), acceptance = el('acceptance'), when = el('when')
+  var live = el('live'), provider = el('provider'), language = el('language')
+  var visibility = el('visibility-note'), slotTag = el('slot-tag')
+
+  // The plugin's own stylesheet, injected exactly as the capsule injects it.
+  var style = document.createElement('style')
+  style.textContent = api.CAPSULE_CSS
+  document.head.appendChild(style)
+
+  function pad(n) { return n < 10 ? '0' + n : String(n) }
+
+  /** Beijing wall-clock parts of an instant, without Intl (demo-only helper). */
+  function bjParts(ms) {
+    var d = new Date(ms + 8 * 3600000)
+    return {
+      year: d.getUTCFullYear(), month: d.getUTCMonth() + 1, day: d.getUTCDate(),
+      hour: d.getUTCHours(), minute: d.getUTCMinutes(), second: d.getUTCSeconds()
+    }
+  }
+
+  function toInputValue(ms) {
+    var p = bjParts(ms)
+    return p.year + '-' + pad(p.month) + '-' + pad(p.day) + 'T' + pad(p.hour) + ':' + pad(p.minute) + ':' + pad(p.second)
+  }
+
+  function fromInputValue(value) {
+    var m = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})(?::(\d{2}))?/.exec(value || '')
+    if (!m) return Date.now()
+    return api.fromBeijing(+m[1], +m[2], +m[3], +m[4], +m[5], +(m[6] || 0))
+  }
+
+  function currentInstant() {
+    return live.checked ? Date.now() : fromInputValue(when.value)
+  }
+
+  function route() { return ROUTES[provider.value] }
+
+  function render() {
+    var now = currentInstant()
+    if (!live.checked && when.value === '') when.value = toInputValue(now)
+    var state = api.getPricingState(now)
+    var lang = language.value
+    var presentation = api.buildPresentation(state, lang)
+    var visible = api.isDeepSeekSession(route())
+
+    // --- capsule ---
+    var remaining = Math.max(0, state.msUntilChange - (Date.now() - state.now))
+    capsule.className = api.capsuleClass(state.phase, presentation.calendarStale)
+    capsule.setAttribute('data-phase', state.phase)
+    capsule.setAttribute('data-rule', state.rule)
+    capsule.setAttribute('aria-label', presentation.ariaLabel)
+    capsule.style.visibility = visible ? 'visible' : 'hidden'
+    capsule.textContent = visible
+      ? api.buildLabel(
+        state.phase,
+        api.formatDuration(live.checked ? remaining : state.msUntilChange, lang),
+        lang,
+      )
+      : ''
+    tooltip.textContent = presentation.tooltip
+    slotTag.textContent = visible
+      ? 'conversation.session.header.utilities · order −20'
+      : 'слот пуст (индикатор скрыт)'
+    visibility.textContent = visible
+      ? 'Провайдер сессии — DeepSeek: капсула показана. Наведите курсор, чтобы увидеть подсказку.'
+      : 'Провайдер сессии не DeepSeek (или проекция modelSelection отсутствует): индикатор скрыт, чтобы не вводить в заблуждение.'
+
+    // --- readout ---
+    var rows = [
+      ['Пекинское время', api.formatBeijingClock(state.now) + ' · ' + api.weekdayName(state.weekday, lang) + ' (' + state.date + ')'],
+      ['Локальное время браузера', new Date(state.now).toString()],
+      ['Правило дня', state.rule],
+      ['Фаза', state.phase === 'peak' ? '⚡ пик (полный тариф)' : '🌙 непик (−' + Math.round((1 - 0.5) * 100) + '%)'],
+      ['Пиковое окно', state.window ? (state.window.start / 3600) + ':00–' + (state.window.end / 3600) + ':00' : '—'],
+      ['Следующее переключение', api.formatBeijingClock(state.nextChangeAt) + ' → ' + state.nextPhase],
+      ['Осталось', api.formatDuration(state.msUntilChange, lang) + (state.msUntilChange < 3600000 ? ' (показываются секунды)' : '')],
+      ['Календарь КНР', state.calendarCovered ? 'покрыт (' + api.COVERED_YEARS.join(', ') + ')' : 'НЕ покрыт — данные могут быть устаревшими']
+    ]
+    readout.innerHTML = rows.map(function (r) {
+      return '<dt>' + r[0] + '</dt><dd>' + r[1] + '</dd>'
+    }).join('')
+    json.textContent = JSON.stringify({
+      phase: state.phase, rule: state.rule, date: state.date, weekday: state.weekday,
+      window: state.window, nextChangeAt: new Date(state.nextChangeAt).toISOString(),
+      msUntilChange: state.msUntilChange, calendarCovered: state.calendarCovered
+    }, null, 2)
+
+    // --- day timeline ---
+    var rule = state.rule
+    var segs = []
+    if (rule === 'workday' || rule === 'makeup-workday') {
+      segs = [{ from: 0, to: 9, peak: false }, { from: 9, to: 12, peak: true },
+              { from: 12, to: 14, peak: false }, { from: 14, to: 18, peak: true },
+              { from: 18, to: 24, peak: false }]
+    } else {
+      segs = [{ from: 0, to: 24, peak: false }]
+    }
+    timeline.innerHTML = segs.map(function (s) {
+      return '<div class="seg ' + (s.peak ? 'peak' : 'off') + '" style="left:' + (s.from / 24 * 100) +
+        '%;width:' + ((s.to - s.from) / 24 * 100) + '%"></div>'
+    }).join('') + '<div class="cursor" data-time="' + pad(bjParts(now).hour) + ':' + pad(bjParts(now).minute) +
+      '" style="left:' + ((bjParts(now).hour * 3600 + bjParts(now).minute * 60 + bjParts(now).second) / 86400 * 100) + '%"></div>'
+    scale.innerHTML = [0, 6, 9, 12, 14, 18, 24].map(function (h) {
+      return '<span>' + pad(h) + ':00</span>'
+    }).join('')
+
+    // --- week strip ---
+    var days = []
+    for (var i = 0; i < 7; i++) {
+      var at = api.fromBeijing(bjParts(now).year, bjParts(now).month, bjParts(now).day + i, 10, 30)
+      var s = api.getPricingState(at)
+      var label = s.rule === 'holiday' ? 'праздник · непик'
+        : s.rule === 'weekend' ? 'выходной · непик'
+        : s.rule === 'makeup-workday' ? 'перенос · как будни'
+        : 'будни · пик 9–12, 14–18'
+      days.push('<div class="day" data-rule="' + s.rule + '"><b>' + s.date.slice(5) + ' ' +
+        api.weekdayName(s.weekday, lang) + '</b><span>' + label + '</span></div>')
+    }
+    week.innerHTML = days.join('')
+
+    renderAcceptance()
+  }
+
+  var CASES = [
+    { name: 'Обычный будний день, пиковый час', at: [2026, 10, 13, 10, 30], expect: 'peak', rule: 'workday' },
+    { name: 'Обычный будний день, непиковый час', at: [2026, 10, 13, 13, 0], expect: 'off-peak', rule: 'workday' },
+    { name: 'Суббота', at: [2026, 10, 17, 11, 0], expect: 'off-peak', rule: 'weekend' },
+    { name: 'Воскресенье', at: [2026, 10, 18, 11, 0], expect: 'off-peak', rule: 'weekend' },
+    { name: 'Праздник в будний день (1 октября, чт, 10:30)', at: [2026, 10, 1, 10, 30], expect: 'off-peak', rule: 'holiday' },
+    { name: 'Перенесённая рабочая суббота (10 октября, 15:00)', at: [2026, 10, 10, 15, 0], expect: 'peak', rule: 'makeup-workday' },
+    { name: 'Перенесённое рабочее воскресенье (20 сентября, 09:30)', at: [2026, 9, 20, 9, 30], expect: 'peak', rule: 'makeup-workday' },
+    { name: 'Граница окна: 11:59:59 → 12:00:00', at: [2026, 10, 13, 11, 59, 59], expect: 'peak', rule: 'workday' }
+  ]
+
+  function renderAcceptance() {
+    acceptance.innerHTML = CASES.map(function (c) {
+      var ms = api.fromBeijing(c.at[0], c.at[1], c.at[2], c.at[3], c.at[4], c.at[5] || 0)
+      var s = api.getPricingState(ms)
+      var pass = s.phase === c.expect && s.rule === c.rule
+      return '<tr><td>' + c.name + '</td><td class="muted">' + c.expect + ' / ' + c.rule + '</td>' +
+        '<td class="result">' + (s.phase === 'peak' ? '⚡' : '🌙') + ' ' + s.phase + ' / ' + s.rule +
+        ' <span class="pill">' + api.formatBeijingClock(ms) + '</span></td>' +
+        '<td class="' + (pass ? 'ok">OK' : 'bad">СБОЙ') + '</td></tr>'
+    }).join('')
+  }
+
+  // --- wiring ---
+  live.addEventListener('change', function () {
+    when.disabled = live.checked
+    if (!live.checked) when.value = toInputValue(Date.now())
+    render()
+  })
+  when.disabled = true
+  when.addEventListener('input', function () { live.checked = false; when.disabled = false; render() })
+  provider.addEventListener('change', render)
+  language.addEventListener('change', render)
+  Array.prototype.forEach.call(document.querySelectorAll('button[data-at]'), function (b) {
+    b.addEventListener('click', function () {
+      live.checked = false
+      when.disabled = false
+      when.value = b.getAttribute('data-at')
+      render()
+    })
+  })
+
+  el('holiday-count').textContent = api.CN_HOLIDAYS_2026.length
+  el('makeup-list').textContent = api.CN_MAKEUP_WORKDAYS_2026.join(', ')
+  el('covered-years').textContent = api.COVERED_YEARS.join(', ') + ' (2027 — пустая таблица до публикации уведомления)'
+
+  render()
+  setInterval(function () { if (live.checked) render() }, 1000)
+})()
+</script>
+</body>
+</html>

@@ -1,0 +1,43 @@
+# ── Dependencies ─────────────────────────────────────────────────────────────
+node_modules/
+
+# ── Build artifacts ──────────────────────────────────────────────────────────
+# lib/ (host + browser halves, declarations) and dist/ (standalone demo page)
+# are produced by `npm run build` / `npm run demo`; a git install rebuilds them
+# through the `prepare` script, so committing them only creates stale copies.
+lib/
+dist/
+
+# ── Release tarballs ─────────────────────────────────────────────────────────
+# `npm pack` output; distribute through the registry or GitHub releases instead.
+*.tgz
+
+# ── Test and tooling caches ──────────────────────────────────────────────────
+coverage/
+*.tsbuildinfo
+
+# ── Logs ─────────────────────────────────────────────────────────────────────
+*.log
+npm-debug.log*
+pnpm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# ── Editors and OS junk ──────────────────────────────────────────────────────
+.idea/
+.vscode/
+*.swp
+.DS_Store
+Thumbs.db
+ehthumbs.db
+desktop.ini
+
+# ── Local secrets ────────────────────────────────────────────────────────────
+.env
+.env.*
+!.env.example
+
+# NOTE: package-lock.json and .npmrc are intentionally tracked — CI relies on
+# `npm ci`, and the lockfile plus the legacy-peer-deps setting (the DSH alpha
+# line has an unresolvable cordis peer conflict) are what make installs
+# reproducible.

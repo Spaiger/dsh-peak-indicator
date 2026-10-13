@@ -1,0 +1,33 @@
+{
+  // Standalone mirror of the DSH monorepo's client compiler shape
+  // (tsconfig.base.json + tsconfig.base.client.json). Inside the repository,
+  // replace `compilerOptions` with
+  //   "extends": "../../../tsconfig.base.client.json",
+  //   "compilerOptions": { "rootDir": "src", "outDir": "lib/types" },
+  // and add project references to vendor/cordis plus the dsh-client-* packages
+  // this plugin imports types from.
+  "compilerOptions": {
+    "target": "es2024",
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "lib": ["ES2024", "DOM", "DOM.Iterable"],
+    "jsx": "react-jsx",
+    "declaration": true,
+    "declarationMap": true,
+    "sourceMap": true,
+    "noEmit": true,
+    "esModuleInterop": true,
+    "allowImportingTsExtensions": true,
+    "rewriteRelativeImportExtensions": true,
+    "skipLibCheck": true,
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "exactOptionalPropertyTypes": true,
+    "noImplicitOverride": true,
+    "noFallthroughCasesInSwitch": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "types": []
+  },
+  "include": ["src"]
+}

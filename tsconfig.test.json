@@ -1,0 +1,10 @@
+{
+  // Test program: the suites run under vitest on Node, so they get the node
+  // types the browser `src` program must not see (DSH keeps the same split:
+  // tsconfig.base.client.json for packages, tsconfig.client.json for tests).
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "types": ["node"]
+  },
+  "include": ["src", "tests", "demo"]
+}

@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "Peak / off-peak indicator",
+    "description": "Adds a ⚡ Peak / 🌙 Off-peak capsule to the Session header for DeepSeek sessions, with a countdown to the next tariff change. Beijing time (Asia/Shanghai), PRC statutory holidays and make-up workdays included; no network access."
+  }
+}

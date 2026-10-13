@@ -1,0 +1,14 @@
+# The configuration layer this package contributes to a DSH profile.
+#
+# One Loader row is enough for a browser plugin: the package's `dsh.client`
+# manifest is what tells the client-modules host half to compile
+# `lib/client.js` into the boot graph and serve it under `/plugins`. The row
+# needs no `config` (the plugin reads its own options from
+# `globalThis.__DSH_PEAK_INDICATOR_CONFIG__`) and no `inject` (its only Cordis
+# service dependency is `slots`, declared by `src/client/index.ts`).
+#
+# Applied by `dsh plugin add` / Settings → Plugins → Add plugin, or by hand
+# from a profile's own cordis.patch.yml or a `--patch` overlay.
+- insert:
+    - id: peak-indicator
+      name: dsh-peak-indicator
