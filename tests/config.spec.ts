@@ -18,8 +18,6 @@ describe('normalizeConfig', () => {
   })
 
   it('keeps the required defaults', () => {
-    expect(DEFAULTS.refreshMs).toBe(30_000)
-    expect(DEFAULTS.fastRefreshMs).toBe(1_000)
     expect(DEFAULTS.slot).toBe('conversation.session.header.utilities')
     expect(DEFAULTS.order).toBe(-20)
     expect(DEFAULTS.showWhenUnknown).toBe(false)
@@ -29,14 +27,12 @@ describe('normalizeConfig', () => {
 
   it('merges the accepted fields', () => {
     const config = normalizeConfig({
-      refreshMs: 60_000,
       order: 40,
       slot: 'conversation.session.header.actions',
       language: 'en',
       showWhenUnknown: true,
       providerIds: ['my-proxy'],
     })
-    expect(config.refreshMs).toBe(60_000)
     expect(config.order).toBe(40)
     expect(config.slot).toBe('conversation.session.header.actions')
     expect(config.language).toBe('en')
@@ -48,16 +44,12 @@ describe('normalizeConfig', () => {
 
   it('rejects values it cannot use', () => {
     const config = normalizeConfig({
-      refreshMs: 0,
-      fastRefreshMs: 'fast',
       order: Number.NaN,
       slot: 'conversation.session.header.corner',
       language: 'de',
       providerIds: 'deepseek',
       modelPrefixes: [],
     })
-    expect(config.refreshMs).toBe(DEFAULTS.refreshMs)
-    expect(config.fastRefreshMs).toBe(DEFAULTS.fastRefreshMs)
     expect(config.order).toBe(DEFAULTS.order)
     expect(config.slot).toBe(DEFAULTS.slot)
     expect(config.language).toBeUndefined()
@@ -68,8 +60,8 @@ describe('normalizeConfig', () => {
 
 describe('readConfig', () => {
   it('reads the injected global', () => {
-    const scope = { [CONFIG_GLOBAL]: { refreshMs: 15_000 } }
-    expect(readConfig(scope).refreshMs).toBe(15_000)
+    const scope = { [CONFIG_GLOBAL]: { order: 15 } }
+    expect(readConfig(scope).order).toBe(15)
   })
 
   it('falls back to the defaults with no global', () => {

@@ -17,7 +17,7 @@ import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'
 import type {} from '@deepseek-ai/dsh-client-ui-session/client'
 import type { ModelSelectionProjection } from '@deepseek-ai/dsh-api-session-controller/types'
 import { Tooltip } from '@deepseek-ai/dsh-client-ui-primitives'
-import { getPricingState, type PricingState } from '../pricing.ts'
+import { getPricingState } from '../pricing.ts'
 import { isDeepSeekSession } from '../provider.ts'
 import { buildLabel, buildPresentation, formatDuration, showsSeconds, type Language } from '../strings.ts'
 import type { ResolvedConfig } from '../config.ts'
@@ -66,17 +66,26 @@ export function PeakIndicator(props: PeakIndicatorProps | PeakIndicatorActionPro
   // and removed with the last one (a component effect, not module evaluation:
   // the DSH module system is lazy-CJS).
   useEffect(useCapsuleStyle, [])
-  // The tariff state is recomputed on the slow tick; only the countdown text
-  // follows the fast tick, so a seconds display costs no extra calendar work.
-  const slowNow = useClock(config.refreshMs)
-  const state = useMemo(() => getPricingState(slowNow), [slowNow])
-  const fastNow = useClock(showsSeconds(state.msUntilChange) ? config.fastRefreshMs : null)
-  // Tooltip and accessible name follow the slow tick; only the countdown text
-  // follows the fast one, so a seconds display costs no extra `Intl` work.
+  // One clock, woken exactly when a displayed digit can change: on every wall
+  // minute while the countdown shows minutes (one wake per minute, half the old
+  // 30 s polling rate), on every wall second while it shows seconds. Every
+  // tariff boundary (09:00, 12:00, 14:00, 18:00, midnight) lies on a minute
+  // boundary, so the aligned wake also flips the phase with zero latency —
+  // no polling lag and no wake that cannot change the label.
+  const [granularity, setGranularity] = useState(MINUTE_MS)
+  const now = useAlignedClock(granularity)
+  const state = useMemo(() => getPricingState(now), [now])
+  useEffect(() => {
+    const next = showsSeconds(state.msUntilChange) ? SECOND_MS : MINUTE_MS
+    if (next !== granularity) setGranularity(next)
+  }, [state, granularity])
+  // The reading and the label share one instant, so the countdown is exactly
+  // `msUntilChange` of the render's reading: there is no second time source to
+  // drift or freeze against the state.
   const presentation = useMemo(() => buildPresentation(state, language), [state, language])
   const label = useMemo(
-    () => buildLabel(state.phase, formatDuration(remainingMs(state, fastNow), language), language),
-    [state.phase, language, state.msUntilChange, state.now, fastNow],
+    () => buildLabel(state.phase, formatDuration(state.msUntilChange, language), language),
+    [state, language],
   )
   if (!deepseek) return null
   return (
@@ -100,32 +109,54 @@ export function PeakIndicator(props: PeakIndicatorProps | PeakIndicatorActionPro
   )
 }
 
-/**
- * Live countdown for one reading.
- * @param state - the reading from the slow tick.
- * @param now - the fast tick's sample.
- * @returns milliseconds left until the next phase change, clamped at zero.
- */
-function remainingMs(state: PricingState, now: number): number {
-  return Math.max(0, state.msUntilChange - (now - state.now))
-}
+/** One second, in milliseconds: the seconds-mode wake period. */
+const SECOND_MS = 1_000
+
+/** One minute, in milliseconds: the minutes-mode wake period. */
+const MINUTE_MS = 60_000
 
 /**
- * Component-local clock.
- * @param intervalMs - tick period, or `null` to freeze (hidden tab, no need).
- * @returns the current `Date.now()` sampled on that period.
+ * Component-local clock woken on display-digit boundaries.
+ *
+ * A chained `setTimeout` fires on the next multiple of `granularityMs` in wall
+ * time (epoch-aligned; Beijing is a whole-minute offset, so wall and Beijing
+ * boundaries coincide). Each wake recomputes from `Date.now()`, which makes the
+ * chain self-correcting after a system-clock step; sleeping machines fire the
+ * overdue wake on resume; `visibilitychange` resyncs the instant the tab
+ * returns. Background tabs skip the render work but keep the chain, where the
+ * browser's own throttling (≥1/min for chained timeouts) caps the rate.
+ * @param granularityMs - wake period: 60 000 while the label shows minutes,
+ * 1 000 while it shows seconds.
+ * @returns the instant of the latest wake.
  */
-function useClock(intervalMs: number | null): number {
+function useAlignedClock(granularityMs: number): number {
   const [now, setNow] = useState(() => Date.now())
   useEffect(() => {
-    if (intervalMs === null) return undefined
-    setNow(Date.now())
-    const timer = setInterval(() => {
-      // A background tab is throttled and invisible; skip the work entirely.
-      if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return
-      setNow(Date.now())
-    }, intervalMs)
-    return () => { clearInterval(timer) }
-  }, [intervalMs])
+    let timer: ReturnType<typeof setTimeout> | undefined
+    let active = true
+    const schedule = () => {
+      if (!active) return
+      const delay = granularityMs - (Date.now() % granularityMs)
+      timer = setTimeout(() => {
+        if (!active) return
+        // A hidden tab is throttled and invisible: skip the render work, keep
+        // the chain; the visibility listener resyncs on return.
+        if (typeof document === 'undefined' || document.visibilityState !== 'hidden') {
+          setNow(Date.now())
+        }
+        schedule()
+      }, delay)
+    }
+    const resync = () => {
+      if (active) setNow(Date.now())
+    }
+    schedule()
+    if (typeof document !== 'undefined') document.addEventListener('visibilitychange', resync)
+    return () => {
+      active = false
+      if (timer !== undefined) clearTimeout(timer)
+      if (typeof document !== 'undefined') document.removeEventListener('visibilitychange', resync)
+    }
+  }, [granularityMs])
   return now
 }

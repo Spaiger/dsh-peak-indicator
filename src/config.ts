@@ -23,10 +23,6 @@ export interface PeakIndicatorConfigInput {
   readonly modelPrefixes?: readonly string[]
   /** Show the capsule while a session's model route is still unresolved. */
   readonly showWhenUnknown?: boolean
-  /** Capsule recalculation period in milliseconds. */
-  readonly refreshMs?: number
-  /** Recalculation period used while the countdown shows seconds. */
-  readonly fastRefreshMs?: number
   /** Force one language instead of following the browser. */
   readonly language?: string
   /** Slot the capsule registers into. */
@@ -47,8 +43,6 @@ export const DEFAULTS: ResolvedConfig = {
   providerPrefixes: ['deepseek'],
   modelPrefixes: ['deepseek-'],
   showWhenUnknown: false,
-  refreshMs: 30_000,
-  fastRefreshMs: 1_000,
   language: undefined,
   slot: 'conversation.session.header.utilities',
   order: -20,
@@ -67,8 +61,6 @@ export function normalizeConfig(input: unknown): ResolvedConfig {
     providerPrefixes: stringArray(raw.providerPrefixes, DEFAULTS.providerPrefixes),
     modelPrefixes: stringArray(raw.modelPrefixes, DEFAULTS.modelPrefixes),
     showWhenUnknown: booleanOf(raw.showWhenUnknown, DEFAULTS.showWhenUnknown),
-    refreshMs: positiveInt(raw.refreshMs, DEFAULTS.refreshMs),
-    fastRefreshMs: positiveInt(raw.fastRefreshMs, DEFAULTS.fastRefreshMs),
     ...languageOf(raw.language),
     slot: raw.slot === 'conversation.session.header.actions'
       ? 'conversation.session.header.actions'
@@ -107,12 +99,6 @@ function stringArray(value: unknown, fallback: readonly string[]): readonly stri
 /** Accept a boolean, else fall back. */
 function booleanOf(value: unknown, fallback: boolean): boolean {
   return typeof value === 'boolean' ? value : fallback
-}
-
-/** Accept a positive finite integer, else fall back. */
-function positiveInt(value: unknown, fallback: number): number {
-  if (typeof value !== 'number' || !Number.isFinite(value) || value < 100) return fallback
-  return Math.floor(value)
 }
 
 /** Accept a shipped language id, else follow the browser. */

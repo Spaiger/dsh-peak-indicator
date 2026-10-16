@@ -217,8 +217,6 @@ globalThis.__DSH_PEAK_INDICATOR_CONFIG__ = {
   providerPrefixes: ['deepseek'],
   modelPrefixes: ['deepseek-'],
   showWhenUnknown: false,        // show the capsule before the session's first model request
-  refreshMs: 30_000,             // tariff recalculation period (the spec's 30 s)
-  fastRefreshMs: 1_000,          // tick period while the countdown shows seconds
   language: undefined,           // 'ru' | 'en'; undefined follows navigator.language
   slot: 'conversation.session.header.utilities',   // or 'conversation.session.header.actions'
   order: -20,
@@ -233,7 +231,7 @@ Every field is optional; malformed values fall back to defaults (`normalizeConfi
 
 - **Timezone safety.** The only conversion path is `Intl.DateTimeFormat` with `timeZone: 'Asia/Shanghai'`; the reverse direction uses the constant +08:00 offset (China has had no DST since 1991). The suite runs at `TZ=Pacific/Kiritimati` (UTC+14) and asserts the local date differs, so nothing can pass by relying on the machine's zone.
 - **Transitions, not day boundaries.** The countdown targets the next *phase* change. Midnight into a holiday changes the rule but not the phase, so the timer runs on to the first real switch — e.g. straight to 09:00 on the first workday after a holiday run.
-- **Refresh cadence.** The tariff state recalculates every 30 s; when less than an hour remains the capsule shows seconds and the tick tightens to 1 s so the display does not jump in half-minute steps. Background tabs skip ticks entirely.
+- **Refresh cadence: boundary-aligned wakes, not polling.** The capsule wakes exactly when a displayed digit can change — on every wall-minute boundary while the countdown shows minutes (one wake per minute), on every wall-second boundary while it shows seconds. Every tariff boundary (09:00, 12:00, 14:00, 18:00, midnight) lies on a minute boundary, so the same aligned wake flips the phase with zero latency. Each wake recomputes from `Date.now()`, which makes the chain self-correcting after a system-clock step; an overdue wake fires on machine resume, and `visibilitychange` resyncs the instant a tab returns. Hidden tabs keep the chain but skip rendering (the browser caps chained timeouts at ≥1/min anyway). Versus the brief's original 30 s poll: half the wakes, an exact minute instead of one up to 29 s stale, and exact switches instead of up to 30 s of lag.
 - **Session detection.** The durable model route comes from the `modelSelection` projection (`{ lastUsed, next }`) via the framework's `useProjection` hook. Shipped DeepSeek provider ids are `deepseek-account` and `deepseek-official`; a user-defined provider still matches through the `deepseek-*` model prefix. `next` wins over `lastUsed`, so switching away hides the capsule immediately. No projection at all (capability absent) means hidden, even with `showWhenUnknown`.
 - **DSH client discipline.** No subscription machinery in the component (local `useState` clock + framework hooks only), derived values via `useMemo`, styles injected as one shared `<style>` tag from a component effect (the DSH module system is lazy-CJS), and the browser bundle keeps only baseline externals: `react`, `react/jsx-runtime`, `@deepseek-ai/dsh-client-ui-primitives`. Everything else, including the stylesheet, is inlined.
 - **Accessibility.** Colour is never the only carrier: emoji, text, `data-phase`, `data-rule`, and an `aria-label` all state the phase.
@@ -274,7 +272,7 @@ dsh-peak-indicator/
 │       ├── index.ts         # browser entry: inject + apply, slot registration
 │       ├── PeakIndicator.tsx# the capsule (hooks, countdown, tooltip)
 │       └── styles.ts        # inline styles + shared <style> injection
-├── tests/                   # 85 tests across 6 specs (see below)
+├── tests/                   # 88 tests across 7 specs (see below)
 ├── demo/                    # standalone preview (dist/demo.html)
 ├── tools/verify-demo.mjs    # happy-dom render check for the demo page
 └── .github/workflows/ci.yml # typecheck + build + tests + demo on Node 20 & 22
@@ -284,7 +282,7 @@ dsh-peak-indicator/
 
 ```bash
 npm install        # .npmrc carries legacy-peer-deps for the DSH alpha line
-npm test           # bundles first (the bundle spec tests the artifact), then 85 tests
+npm test           # bundles first (the bundle spec tests the artifact), then 88 tests
 npm run verify     # typecheck → build → test → demo, in one go
 ```
 
@@ -299,7 +297,7 @@ npm run verify     # typecheck → build → test → demo, in one go
 
 ### Tests
 
-85 tests, all green on CI (Node 20 and 22):
+88 tests, all green on CI (Node 20 and 22):
 
 - **`pricing.spec.ts` (31)** — every case the brief demands (weekday peak hour, weekday off-peak hour, Saturday, Sunday, weekday holiday inside a peak window, make-up workday Saturday), window edges to the millisecond, midnight-into-holiday, a holiday run ending on a weekend, Friday 18:00 → Monday 09:00, the New-Year boundary into an uncovered year, table integrity (make-up days only on weekends, never on holidays), and a **minute-by-minute sweep of a full week** asserting every instant's next transition is in the future, flips the phase, and lands exactly on a tariff boundary.
 - **`strings.spec.ts` (14)** — Russian and English capsule/tooltip copy, countdown formats, the stale-calendar warning, accessible names.
@@ -307,6 +305,7 @@ npm run verify     # typecheck → build → test → demo, in one go
 - **`config.spec.ts` (8)** — normalization and fallbacks.
 - **`bundle.spec.ts` (8)** — executes the built `lib/client.js` through `window.__ModuleLoader__.load({ id, factory })`, materializes it with a fake module table, runs `apply()` against a stub `ctx`, and renders the registered component: plugin shape (`inject === ['slots']`, registration into `conversation.session.header.utilities` with `id: 'peak-indicator'`, `order: -20`), `null` for non-DeepSeek sessions, correct text/`data-*`/tooltip otherwise.
 - **`install.spec.ts` (12)** — the host contract: root `"."` and `./client` exports, `dsh.bundle` + `dsh.client`, `files`, peer ranges, patch layer contents, root module as a valid Cordis plugin with a no-op `apply`, and a Node half free of browser/React dependencies.
+- **`timer.spec.ts` (3)** — a mounted component under fake timers: no re-render between minute boundaries, the label moves exactly on the boundary, second ticks under one hour, and a zero-latency flip at the phase change. Regression cover for the frozen-countdown bug (the label once subtracted a *stopped* clock and cancelled every update) and for any return to fixed-period polling.
 
 ### Build pipeline
 
